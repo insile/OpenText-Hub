@@ -1,0 +1,30 @@
+/* 命令弹窗动作选择自适应布局 */
+.otm-actions-flex {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-top: 8px;
+}
+.otm-action-toggle {
+	display: flex;
+	align-items: center;
+	padding: 4px 8px;
+	border-radius: 4px;
+	background: var(--background-secondary);
+	min-width: 120px;
+	margin-bottom: 4px;
+}
+.otm-action-toggle input[type="checkbox"] {
+	margin-right: 6px;
+}
+.otm-action-toggle span {
+	font-size: 14px;
+}
+/*
+
+This CSS file will be included with your plugin, and
+available in the app when your plugin is enabled.
+
+If your plugin does not need CSS, delete this file.
+
+*/
