@@ -395,16 +395,16 @@ class ActionEditModal extends Modal {
 					.setName('星期')
 					.addDropdown(dropdown => dropdown
 						.addOptions({
-							'1': '周一',
-							'2': '周二',
-							'3': '周三',
-							'4': '周四',
-							'5': '周五',
-							'6': '周六',
-							'7': '周日'
+							1: '周一',
+							2: '周二',
+							3: '周三',
+							4: '周四',
+							5: '周五',
+							6: '周六',
+							7: '周日'
 						})
-						.setValue(manualAction.weekday || '1')
-						.onChange(value => manualAction.weekday = value));
+						.setValue(manualAction.weekday?.toString() || '1')
+						.onChange(value => manualAction.weekday = parseInt(value)));
 			}
 		} else if (manualAction.fieldType === 'number') {
 			new Setting(contentEl)

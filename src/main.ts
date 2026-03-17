@@ -178,7 +178,7 @@ export default class OpenTextManager extends Plugin {
 					const monday = new Date(now);
 					monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
 					const targetDay = new Date(monday);
-					targetDay.setDate(monday.getDate() + (this.asNumber(action.numberValue) - 1));
+					targetDay.setDate(monday.getDate() + (this.asNumber(action.weekday) - 1));
 					newData = this.formatDate(targetDay);
 				}
 				break;

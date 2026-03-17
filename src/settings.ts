@@ -14,7 +14,7 @@ export interface ManualAction {
 	numberValue?: number;
 	stringValue?: string;
 	period?: string;
-	weekday?: string;
+	weekday?: number;
 }
 
 // 自动更新
