@@ -1,7 +1,7 @@
-import {App, ItemView, Modal, Notice, Setting, TextAreaComponent, WorkspaceLeaf} from "obsidian";
-import type OpenTextManager from "./main";
+import {App, ItemView, Modal, Notice, Setting, WorkspaceLeaf} from "obsidian";
 import {Action, AutoAction, Command, ManualAction} from "./settings";
-import { FolderSuggest } from "./inputSuggest";
+import {FolderSuggest} from "./inputSuggest";
+import OpenTextManager from "./main";
 
 
 // 视图类型常量
@@ -22,6 +22,7 @@ export class ConfigView extends ItemView {
 	}
 
 	getDisplayText() {
+		// eslint-disable-next-line obsidianmd/ui/sentence-case
 		return "OpenText 管理";
 	}
 
@@ -80,14 +81,14 @@ export class ConfigView extends ItemView {
             name: '',
 			field: '',
             type: 'manual',
-            fieldType: 'text',
+            fieldType: 'number',
             operation: 'set',
-            value: ''
         };
         const modal = new ActionEditModal(this.app, action, (updatedAction) => {
             this.plugin.settings.actions.push(updatedAction);
-            this.plugin.saveSettings();
-            this.render();
+			void this.plugin.saveSettings().then(() => {
+				this.render();
+			});
         });
         modal.open();
     }
@@ -105,14 +106,14 @@ export class ConfigView extends ItemView {
 		setting.addButton(button => button
 			.setButtonText('删除')
 			.setWarning()
-			.onClick(() => {
+			.onClick(async () => {
 				const actionId = this.plugin.settings.actions[index]?.id;
 				this.plugin.settings.actions.splice(index, 1);
 				// 更新依赖的命令
 				this.plugin.settings.commands.forEach(command => {
 					command.actions = command.actions.filter(id => id !== actionId);
 				});
-				this.plugin.saveSettings();
+				await this.plugin.saveSettings();
 				this.render();
 			}));
 	}
@@ -120,7 +121,7 @@ export class ConfigView extends ItemView {
 	// 获取动作描述
 	private getActionDesc(action: Action): string {
 		if (action.type === 'manual') {
-			const manualAction = action as ManualAction;
+			const manualAction = action;
 			return `${this.translateFieldType(manualAction.fieldType)} · ${this.translateOperation(manualAction)}`;
 		} else {
 			return `自动更新`;
@@ -177,8 +178,9 @@ export class ConfigView extends ItemView {
 	private editAction(action: Action, index: number) {
 		const modal = new ActionEditModal(this.app, action, (updatedAction) => {
 			this.plugin.settings.actions[index] = updatedAction;
-			this.plugin.saveSettings();
-			this.render();
+			void this.plugin.saveSettings().then(() => {
+				this.render();
+			});
 		});
 		modal.open();
 	}
@@ -193,8 +195,9 @@ export class ConfigView extends ItemView {
 		};
 		const modal = new CommandEditModal(this.plugin,this.app, command, this.plugin.settings.actions, (updatedCommand) => {
 			this.plugin.settings.commands.push(updatedCommand);
-			this.plugin.saveSettings();
-			this.render();
+			void this.plugin.saveSettings().then(() => {
+				this.render();
+			});
 		});
 		modal.open();
 	}
@@ -212,9 +215,9 @@ export class ConfigView extends ItemView {
 		setting.addButton(button => button
 			.setButtonText('删除')
 			.setWarning()
-			.onClick(() => {
+			.onClick(async () => {
 				this.plugin.settings.commands.splice(index, 1);
-				this.plugin.saveSettings();
+				await this.plugin.saveSettings();
 				this.plugin.removeCommand(`opentext-${command.id}`);
 				this.render();
 			}));
@@ -228,8 +231,9 @@ export class ConfigView extends ItemView {
 		};
 		const modal = new CommandEditModal(this.plugin, this.app, tempCommand, this.plugin.settings.actions, (updatedCommand) => {
 			this.plugin.settings.commands[index] = updatedCommand;
-			this.plugin.saveSettings();
-			this.render();
+			void this.plugin.saveSettings().then(() => {
+				this.render();
+			});
 		});
 		modal.open();
 	}
@@ -322,7 +326,7 @@ class ActionEditModal extends Modal {
 				})
 				.setValue(manualAction.fieldType)
 				.onChange(value => {
-					manualAction.fieldType = value as any;
+					manualAction.fieldType = value as ManualAction['fieldType'];
 					// 重置操作到新字段类型的默认值
 					switch (value) {
 						case 'checkbox':
@@ -377,8 +381,8 @@ class ActionEditModal extends Modal {
 				new Setting(contentEl)
 					.setName('日期值')
 					.addText(text => text
-						.setValue(manualAction.value as string || '')
-						.onChange(value => manualAction.value = value));
+						.setValue(manualAction.dateValue as string || '')
+						.onChange(value => manualAction.dateValue = value));
 			} else if (manualAction.operation === 'add' || manualAction.operation === 'subtract') {
 				new Setting(contentEl)
 					.setName('周期值')
@@ -399,8 +403,8 @@ class ActionEditModal extends Modal {
 							'6': '周六',
 							'7': '周日'
 						})
-						.setValue(manualAction.value?.toString() || '1')
-						.onChange(value => manualAction.value = parseInt(value)));
+						.setValue(manualAction.weekday || '1')
+						.onChange(value => manualAction.weekday = value));
 			}
 		} else if (manualAction.fieldType === 'number') {
 			new Setting(contentEl)
@@ -422,8 +426,8 @@ class ActionEditModal extends Modal {
 			new Setting(contentEl)
 				.setName('数值')
 				.addText(text => text
-					.setValue(manualAction.value?.toString() || '')
-					.onChange(value => manualAction.value = parseFloat(value)));
+					.setValue(manualAction.numberValue?.toString() || '')
+					.onChange(value => manualAction.numberValue = parseFloat(value)));
 		} else if (manualAction.fieldType === 'text') {
 			new Setting(contentEl)
 				.setName('操作')
@@ -437,8 +441,8 @@ class ActionEditModal extends Modal {
 			new Setting(contentEl)
 				.setName('文本内容')
 				.addText(text => text
-					.setValue(manualAction.value as string || '')
-					.onChange(value => manualAction.value = value));
+					.setValue(manualAction.stringValue as string || '')
+					.onChange(value => manualAction.stringValue = value));
 		}
 	}
 

@@ -10,8 +10,11 @@ export interface ManualAction {
 	type: 'manual';
 	fieldType: 'checkbox' | 'date' | 'number' | 'text';
 	operation: string;
-	value?: string | number;
+	dateValue?: string;
+	numberValue?: number;
+	stringValue?: string;
 	period?: string;
+	weekday?: string;
 }
 
 // 自动更新
@@ -64,12 +67,14 @@ export class OpenTextSettingTab extends PluginSettingTab {
 
 		new Setting(containerEl)
 			.setName('API key')
+			// eslint-disable-next-line obsidianmd/ui/sentence-case
 			.setDesc('选择一个 API 密钥，目前只支持 DeepSeek。')
-			.addComponent((el: any) => new SecretComponent(this.app, el)
+			.addComponent((el) => new SecretComponent(this.app, el)
 				.setValue(this.plugin.settings.apiKey)
-				.onChange((value: string) => {
+				.onChange(async (value: string) => {
 				this.plugin.settings.apiKey = value;
-				this.plugin.saveSettings();
+				await this.plugin.saveSettings();
         }));
 	}
 }
+
