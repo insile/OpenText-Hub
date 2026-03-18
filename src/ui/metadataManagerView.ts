@@ -1,29 +1,28 @@
-import {App, ItemView, Modal, Notice, Setting, WorkspaceLeaf} from "obsidian";
-import {Action, AutoAction, Command, ManualAction} from "./settings";
-import {FolderSuggest} from "./inputSuggest";
-import OpenTextManager from "./main";
+import { App, ItemView, Modal, Notice, Setting, WorkspaceLeaf } from "obsidian";
+import { Action, Command } from "../settings/settingsData";
+import { FolderSuggest } from "../utils/inputSuggest";
+import OpenTextHub from "../main";
 
 
 // 视图类型常量
-export const OPENTEXT_MANAGER_VIEW = "opentext-manager-view";
+export const OPENTEXT_METADATA_MANAGER_VIEW = "opentext-metadata-manager-view";
 
 
-// 插件的配置视图
-export class ConfigView extends ItemView {
-	plugin: OpenTextManager;
+// 元数据管理视图
+export class MetadataManagerView extends ItemView {
+	plugin: OpenTextHub;
 
-	constructor(leaf: WorkspaceLeaf, plugin: OpenTextManager) {
+	constructor(leaf: WorkspaceLeaf, plugin: OpenTextHub) {
 		super(leaf);
 		this.plugin = plugin;
 	}
 
 	getViewType() {
-		return OPENTEXT_MANAGER_VIEW;
+		return OPENTEXT_METADATA_MANAGER_VIEW;
 	}
 
 	getDisplayText() {
-		// eslint-disable-next-line obsidianmd/ui/sentence-case
-		return "OpenText 管理";
+		return "元数据管理";
 	}
 
 	getIcon() {
@@ -129,48 +128,48 @@ export class ConfigView extends ItemView {
 	}
 
 	// 翻译字段类型
-	private translateFieldType(fieldType: ManualAction['fieldType']): string {
+	private translateFieldType(fieldType: Action['fieldType']): string {
 		switch (fieldType) {
 			case 'checkbox': return '复选框';
 			case 'date': return '日期';
 			case 'number': return '数字';
 			case 'text': return '文本';
-			default: return fieldType;
+			default: return fieldType || '未知类型';
 		}
 	}
 
 	// 翻译操作
-	private translateOperation(action: ManualAction): string {
+	private translateOperation(action: Action): string {
 		switch (action.fieldType) {
 			case 'checkbox':
 				switch (action.operation) {
 					case 'toggle': return '切换';
 					case 'set': return '设置为选中';
 					case 'unset': return '设置为取消选中';
-					default: return action.operation;
+					default: return action.operation || '未知操作';
 				}
 			case 'date':
 				switch (action.operation) {
-					case 'set': return '设置日期';
-					case 'add': return '增加周期';
-					case 'subtract': return '减少周期';
+					case 'set': return '设置日期' + (action.dateValue ? `（${action.dateValue}）` : '');
+					case 'add': return '增加周期' + (action.period ? `（${action.period}）` : '');
+					case 'subtract': return '减少周期' + (action.period ? `（${action.period}）` : '');
 					case 'current': return '当前日期';
-					case 'setWeekDay': return '设置为本周星期';
-					default: return action.operation;
+					case 'setWeekDay': return '设置为本周星期' + (action.weekday ? `（${action.weekday}）` : '');
+					default: return action.operation || '未知操作';
 				}
 			case 'number':
 				switch (action.operation) {
-					case 'set': return '设置数值';
-					case 'add': return '加';
-					case 'subtract': return '减';
-					case 'multiply': return '乘';
-					case 'divide': return '除';
-					default: return action.operation;
+					case 'set': return '设置数值' + (action.numberValue ? `（${action.numberValue}）` : '');
+					case 'add': return '加' + (action.numberValue ? `（${action.numberValue}）` : '');
+					case 'subtract': return '减' + (action.numberValue ? `（${action.numberValue}）` : '');
+					case 'multiply': return '乘' + (action.numberValue ? `（${action.numberValue}）` : '');
+					case 'divide': return '除' + (action.numberValue ? `（${action.numberValue}）` : '');
+					default: return action.operation || '未知操作';
 				}
 			case 'text':
-				return '设置文本';
+				return '设置文本' + (action.stringValue ? `（${action.stringValue}）` : '');
 			default:
-				return action.operation;
+				return action.operation || '未知操作';
 		}
 	}
 
@@ -308,7 +307,7 @@ class ActionEditModal extends Modal {
 
 	// 手动更新表单
 	private renderManualForm(contentEl: HTMLElement) {
-		const manualAction = this.action as ManualAction;
+		const manualAction = this.action;
 		new Setting(contentEl)
 			.setName('字段名称')
 			.addText(text => text
@@ -324,9 +323,9 @@ class ActionEditModal extends Modal {
 					'number': '数字',
 					'text': '文本'
 				})
-				.setValue(manualAction.fieldType)
+				.setValue(manualAction.fieldType || 'number')
 				.onChange(value => {
-					manualAction.fieldType = value as ManualAction['fieldType'];
+					manualAction.fieldType = value as Action['fieldType'];
 					// 重置操作到新字段类型的默认值
 					switch (value) {
 						case 'checkbox':
@@ -355,7 +354,7 @@ class ActionEditModal extends Modal {
 						'set': '设置为选中',
 						'unset': '设置为取消选中'
 					})
-					.setValue(manualAction.operation)
+					.setValue(manualAction.operation || 'toggle')
 					.onChange(value => {
 						manualAction.operation = value;
 						this.renderModal();
@@ -371,7 +370,7 @@ class ActionEditModal extends Modal {
 						'current': '设置为当前日期',
 						'setWeekDay': '设置为本周星期'
 					})
-					.setValue(manualAction.operation)
+					.setValue(manualAction.operation || 'set')
 					.onChange(value => {
 						manualAction.operation = value;
 						this.renderModal();
@@ -391,17 +390,18 @@ class ActionEditModal extends Modal {
 						.setValue(manualAction.period || '')
 						.onChange(value => manualAction.period = value));
 			} else if (manualAction.operation === 'setWeekDay') {
+				if (!manualAction.weekday) {manualAction.weekday = 1;}
 				new Setting(contentEl)
 					.setName('星期')
 					.addDropdown(dropdown => dropdown
 						.addOptions({
-							1: '周一',
-							2: '周二',
-							3: '周三',
-							4: '周四',
-							5: '周五',
-							6: '周六',
-							7: '周日'
+							'1': '周一',
+							'2': '周二',
+							'3': '周三',
+							'4': '周四',
+							'5': '周五',
+							'6': '周六',
+							'7': '周日'
 						})
 						.setValue(manualAction.weekday?.toString() || '1')
 						.onChange(value => manualAction.weekday = parseInt(value)));
@@ -417,7 +417,7 @@ class ActionEditModal extends Modal {
 						'multiply': '乘',
 						'divide': '除'
 					})
-					.setValue(manualAction.operation)
+					.setValue(manualAction.operation || 'set')
 					.onChange(value => {
 						manualAction.operation = value;
 						this.renderModal();
@@ -433,7 +433,7 @@ class ActionEditModal extends Modal {
 				.setName('操作')
 				.addDropdown(dropdown => dropdown
 					.addOption('set', '设置文本')
-					.setValue(manualAction.operation)
+					.setValue(manualAction.operation || 'set')
 					.onChange(value => {
 						manualAction.operation = value;
 						this.renderModal();
@@ -452,8 +452,8 @@ class ActionEditModal extends Modal {
 			.setName('提示词')
 			.setDesc('返回 JSON 数据的提示词，可用 {content} 代表文档内容')
 			.addTextArea(text => {
-				text.setValue((this.action as AutoAction).prompt)
-					.onChange(value => (this.action as AutoAction).prompt = value);
+				text.setValue(this.action.prompt || '')
+					.onChange(value => this.action.prompt = value);
 				text.inputEl.rows = 6; // 增加默认行数
 				text.inputEl.cols = 60; // 增加默认行数
 			});
@@ -466,12 +466,12 @@ class ActionEditModal extends Modal {
 
 // 编辑命令的弹窗
 class CommandEditModal extends Modal {
-	plugin: OpenTextManager;
+	plugin: OpenTextHub;
 	command: Command;
 	actions: Action[];
 	onSave: (command: Command) => void;
 
-	constructor(plugin: OpenTextManager, app: App, command: Command, actions: Action[], onSave: (command: Command) => void) {
+	constructor(plugin: OpenTextHub, app: App, command: Command, actions: Action[], onSave: (command: Command) => void) {
 		super(app);
 		this.plugin = plugin;
 		this.command = {...command};
@@ -547,7 +547,7 @@ class CommandEditModal extends Modal {
 					this.plugin.addCommand({
 						id: commandId,
 						name: this.command.name,
-						callback: () => this.plugin.executeCommand(this.command)
+						callback: () => this.plugin.metadataManager.executeCommand(this.command)
 					});
 					this.onSave(this.command);
 					this.close();
