@@ -1,4 +1,4 @@
-import { App, PluginSettingTab, SecretComponent, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, SecretComponent, Setting } from "obsidian";
 import OpenTextHub from "../main";
 
 
@@ -25,6 +25,23 @@ export class OpenTextSettingTab extends PluginSettingTab {
 				this.plugin.settings.apiKey = value;
 				await this.plugin.saveSettings();
         }));
+
+		new Setting(containerEl)
+			.setName('基于最短反向链接的分类')
+			.setDesc('启用后，插件将根据文件的反向链接数据，自动将其分类到路径最短的索引文件上。')
+			.addToggle(toggle => toggle
+				.setValue(this.plugin.settings.classifyByLinkEnabled || false)
+				.onChange(async (value) => {
+					this.plugin.settings.classifyByLinkEnabled = value;
+					await this.plugin.saveSettings();
+					if (value) {
+						this.plugin.classifyByLink.init();
+						this.plugin.classifyByLink.backlinkIndex.init();
+						new Notice("基于最短反向链接的分类已启用");
+					} else {
+						this.plugin.classifyByLink.close();
+					}
+				}));
 	}
 }
 

@@ -3,13 +3,15 @@ export interface OpenTextSettings {
 	apiKey: string;
 	actions: Action[];
 	commands: Command[];
+	classifyByLinkEnabled?: boolean;
 }
 
 // 默认设置
 export const DEFAULT_SETTINGS: OpenTextSettings = {
 	apiKey: '',
 	actions: [],
-	commands: []
+	commands: [],
+	classifyByLinkEnabled: false
 };
 
 // 元数据更新动作

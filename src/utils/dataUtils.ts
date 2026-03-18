@@ -1,11 +1,11 @@
-import { TFile, TFolder } from "obsidian";
+import { App, TFile, TFolder } from "obsidian";
 
 
 // 递归获取文件夹中的所有 Markdown 文件
 export function getFilesInFolder(folder: TFolder): TFile[] {
-    return folder.children.flatMap(child => 
-        child instanceof TFile ? [child] : 
-        child instanceof TFolder ? getFilesInFolder(child) : []
+    return folder.children.flatMap(child =>
+        child instanceof TFile ? [child] :
+            child instanceof TFolder ? getFilesInFolder(child) : []
     );
 }
 
@@ -33,10 +33,10 @@ export const NUMBER_OPERATIONS = {
 
 // 时间周期单位对应的毫秒数
 export const PERIOD_MULTIPLIERS = {
-    d: 24*60*60*1000, 
-    w: 7*24*60*60*1000, 
-    m: 30*24*60*60*1000, 
-    y: 365*24*60*60*1000
+    d: 24 * 60 * 60 * 1000,
+    w: 7 * 24 * 60 * 60 * 1000,
+    m: 30 * 24 * 60 * 60 * 1000,
+    y: 365 * 24 * 60 * 60 * 1000
 } as const;
 
 // 解析时间周期字符串为毫秒数
@@ -63,3 +63,18 @@ export function parseJsonResponse(response: string): Record<string, unknown> | n
     }
 }
 
+
+// 获取文件的反向链接信息
+export function getBacklinks(app: App, targetPath: string) {
+    const backlinks: Record<string, number> = {};
+    const resolvedLinks = app.metadataCache.resolvedLinks;
+
+    for (const source in resolvedLinks) {
+        const links = resolvedLinks[source] || {};
+        if (links[targetPath]) {
+            backlinks[source] = links[targetPath];
+        }
+    }
+
+    return backlinks;
+}
