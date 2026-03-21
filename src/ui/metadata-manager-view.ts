@@ -1,6 +1,6 @@
 import { App, ItemView, Modal, Notice, Setting, WorkspaceLeaf } from "obsidian";
-import { Action, Command } from "../settings/settingsData";
-import { FolderSuggest } from "../utils/inputSuggest";
+import { Action, Command } from "../settings/settings-data";
+import { FolderSuggest } from "../utils/input-suggest";
 import OpenTextHub from "../main";
 
 

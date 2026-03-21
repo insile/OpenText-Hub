@@ -1,8 +1,8 @@
 import OpenTextHub from 'main';
 import { App, MarkdownView, Notice, requestUrl, TFile, TFolder } from 'obsidian';
-import { Action, Command } from 'settings/settingsData';
-import { OPENTEXT_METADATA_MANAGER_VIEW } from 'ui/metadataManagerView';
-import { asNumber, asString, formatDate, getFilesInFolder, NUMBER_OPERATIONS, parseJsonResponse, parsePeriod } from 'utils/dataUtils';
+import { Action, Command } from 'settings/settings-data';
+import { OPENTEXT_METADATA_MANAGER_VIEW } from 'ui/metadata-manager-view';
+import { asNumber, asString, formatDate, getFilesInFolder, NUMBER_OPERATIONS, parseJsonResponse, parsePeriod } from 'utils/data-utils';
 
 
 export class MetadataManager {

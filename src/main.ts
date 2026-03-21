@@ -1,9 +1,9 @@
-import { DEFAULT_SETTINGS, OpenTextSettings } from "./settings/settingsData";
-import { MetadataManagerView, OPENTEXT_METADATA_MANAGER_VIEW } from "./ui/metadataManagerView";
-import { OpenTextSettingTab } from 'settings/settingsTab';
-import { MetadataManager } from 'core/metadataManager';
+import { DEFAULT_SETTINGS, OpenTextSettings } from "./settings/settings-data";
+import { MetadataManagerView, OPENTEXT_METADATA_MANAGER_VIEW } from "./ui/metadata-manager-view";
+import { OpenTextSettingTab } from 'settings/settings-tab';
+import { MetadataManager } from 'core/metadata-manager';
 import { Plugin } from 'obsidian';
-import { ClassifyByLink } from "core/classifyByLink";
+import { ClassifyByLink } from "core/classify-by-backlink";
 
 
 // 主插件类

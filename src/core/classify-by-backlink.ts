@@ -1,6 +1,6 @@
 import OpenTextHub from "main";
 import { App, EventRef, TFile } from "obsidian";
-import { BacklinkIndex } from "./backlinkIndex";
+import { BacklinkIndex } from "./backlink-index";
 
 
 export class ClassifyByLink {
