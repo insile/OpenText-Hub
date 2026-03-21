@@ -2,24 +2,25 @@ import OpenTextHub from 'main';
 import { App, MarkdownView, Notice, requestUrl, TFile, TFolder } from 'obsidian';
 import { Action, Command } from 'settings/settings-data';
 import { OPENTEXT_METADATA_MANAGER_VIEW } from 'ui/metadata-manager-view';
-import { asNumber, asString, formatDate, getFilesInFolder, NUMBER_OPERATIONS, parseJsonResponse, parsePeriod } from 'utils/data-utils';
+import { asNumber, asString, getFilesInFolder, parseJsonResponse, parsePeriod } from 'utils/data-utils';
 
 
 export class MetadataManager {
     app: App;
     plugin: OpenTextHub;
 
+    // 构造函数，注册命令
     constructor(app: App, plugin: OpenTextHub) {
         this.app = app;
         this.plugin = plugin;
         this.plugin.settings.commands.forEach(command => {
-			const commandId = `opentext-${command.id}`;
-			this.plugin.addCommand({
-				id: commandId,
-				name: command.name,
-				callback: () => this.executeCommand(command)
-			});
-		});
+            const commandId = `opentext-${command.id}`;
+            this.plugin.addCommand({
+                id: commandId,
+                name: command.name,
+                callback: () => this.executeCommand(command)
+            });
+        });
     }
 
     // 打开配置面板
@@ -32,14 +33,14 @@ export class MetadataManager {
 
         const leaf = this.app.workspace.getRightLeaf(false);
         if (!leaf) return;
-        await leaf.setViewState({type: OPENTEXT_METADATA_MANAGER_VIEW});
+        await leaf.setViewState({ type: OPENTEXT_METADATA_MANAGER_VIEW });
         await this.app.workspace.revealLeaf(leaf);
     }
 
     // 执行命令
     async executeCommand(command: Command) {
         const notice = new Notice(`正在执行命令："${command.name}"，共 ${command.actions.length} 个动作`);
-        
+
         // 如果未填写目标路径，则处理当前活动页面
         if (!command.folder) {
             const activeView = this.app.workspace.getActiveViewOfType(MarkdownView);
@@ -114,36 +115,63 @@ export class MetadataManager {
             }
             case 'date': {
                 if (action.operation === 'set') {
-                    newData = action.dateValue;
+                    newData = asString(action.dateValue) || window.moment().format('YYYY-MM-DD');
                 } else if (action.operation === 'add' || action.operation === 'subtract') {
-                    const current = new Date(asString(frontmatter[field]) || Date.now());
-                    const period = parsePeriod(action.period || '');
+                    const rawValue = asString(frontmatter[field]);
+                    let current = window.moment(rawValue);
+                    if (!current.isValid()) {
+                        current = window.moment();
+                    }
+                    const { amount, unit } = parsePeriod(action.period || '');
                     const multiplier = action.operation === 'add' ? 1 : -1;
-                    current.setTime(current.getTime() + period * multiplier);
-                    newData = formatDate(current);
+                    current.add(amount * multiplier, unit);
+                    newData = current.format('YYYY-MM-DD');
                 } else if (action.operation === 'current') {
-                    newData = formatDate(new Date());
+                    newData = window.moment().format('YYYY-MM-DD');
                 } else if (action.operation === 'setWeekDay') {
-                    const now = new Date();
-                    const dayOfWeek = now.getDay();
-                    const monday = new Date(now);
-                    monday.setDate(now.getDate() - (dayOfWeek === 0 ? 6 : dayOfWeek - 1));
-                    const targetDay = new Date(monday);
-                    targetDay.setDate(monday.getDate() + (asNumber(action.weekday) - 1));
-                    newData = formatDate(targetDay);
+                    const weekday = asNumber(action.weekday, 1);     // 目标周几
+                    const weekOffset = asNumber(action.weekOffset, 0); // 周偏移
+                    const m = window.moment().startOf('day');
+                    m.isoWeekday(weekday + weekOffset * 7);
+                    newData = m.format('YYYY-MM-DD');
                 }
                 break;
             }
             case 'number': {
-                const currentNum = asNumber(frontmatter[field]);
-                const operand = asNumber(action.numberValue, action.operation === 'multiply' || action.operation === 'divide' ? 1 : 0);
-                const operation = NUMBER_OPERATIONS[action.operation as keyof typeof NUMBER_OPERATIONS];
-                newData = operation ? operation(currentNum, operand) : newData;
+                if (action.operation === 'set') {
+                    newData = asNumber(action.numberValue);
+                } else if (action.operation === 'add') {
+                    newData = asNumber(frontmatter[field]) + asNumber(action.numberValue);
+                } else if (action.operation === 'subtract') {
+                    newData = asNumber(frontmatter[field]) - asNumber(action.numberValue);
+                } else if (action.operation === 'multiply') {
+                    newData = asNumber(frontmatter[field]) * asNumber(action.numberValue, 1);
+                } else if (action.operation === 'divide') {
+                    newData = asNumber(asNumber(frontmatter[field]) / asNumber(action.numberValue, 1), asNumber(frontmatter[field]));
+                }
                 break;
             }
             case 'text': {
                 if (action.operation === 'set') {
-                    newData = action.stringValue;
+                    newData = asString(action.stringValue);
+                } else if (action.operation === 'append') {
+                    newData = asString(frontmatter[field]) + asString(action.stringValue);
+                } else if (action.operation === 'prepend') {
+                    newData = asString(action.stringValue) + asString(frontmatter[field]);
+                } else if (action.operation === 'regex') {
+                    const current = asString(frontmatter[field]);
+                    const pattern = action.regexPattern || '';     // 用户输入的正则，如: \d+
+                    const replacement = action.stringValue || '';  // 替换后的文本
+                    const flags = action.regexFlags || 'g';        // 正则修饰符，默认全局替换
+
+                    try {
+                        const regex = new RegExp(pattern, flags);
+                        newData = current.replace(regex, replacement);
+                    } catch (e) {
+                        // 如果正则解析失败，保持原样并可在控制台报错
+                        console.error("Invalid Regex Pattern:", e);
+                        newData = current;
+                    }
                 }
                 break;
             }
@@ -163,15 +191,15 @@ export class MetadataManager {
         }
 
         const secret = this.app.secretStorage.getSecret(this.plugin.settings.apiKey);
-        
+
         if (!secret) {
             new Notice('未找到对应的 API key，请在插件设置中配置');
             return;
         }
-        
+
         const fileContent = await this.app.vault.cachedRead(file);
         const content = fileContent.replace(/^---\s*\n[\s\S]*?\n---\s*\n?/, '').replace(/\[\[(?:[^|\]]+\|)?([^\]]+)\]\]/g, '$1');
-        
+
         try {
             const response = await requestUrl({
                 url: 'https://api.deepseek.com/v1/chat/completions',
@@ -183,8 +211,8 @@ export class MetadataManager {
                 body: JSON.stringify({
                     model: 'deepseek-chat',
                     messages: [
-                        {"role": "system", "content": '你必须只返回有效的 JSON 数据，不包含任何其他文本。' },
-                        {"role": "user", "content": prompt.replace('{content}', content)},
+                        { "role": "system", "content": '你必须只返回有效的 JSON 数据，不包含任何其他文本。' },
+                        { "role": "user", "content": prompt.replace('{content}', content).replace('{filename}', file.basename) },
                     ],
                 }),
             });
@@ -193,9 +221,9 @@ export class MetadataManager {
                 new Notice(`AI 请求失败: ${response.status}`);
                 return;
             }
-            
+
             const data = JSON.parse(response.text) as Record<string, unknown>;
-            const choices = data.choices as Array<{message: {content: string}}> | undefined;
+            const choices = data.choices as Array<{ message: { content: string } }> | undefined;
             if (!choices?.[0]) {
                 new Notice('AI 响应格式错误');
                 return;
@@ -218,5 +246,5 @@ export class MetadataManager {
             console.debug('Error details:', error);
         }
     }
-    
+
 }

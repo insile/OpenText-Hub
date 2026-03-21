@@ -3,7 +3,7 @@ import { App, EventRef, TFile } from "obsidian";
 import { BacklinkIndex } from "./backlink-index";
 
 
-export class ClassifyByLink {
+export class ClassifyByBacklink {
     app: App;
     plugin: OpenTextHub; // 替换为你的插件类名
     statusBarItem: HTMLElement;

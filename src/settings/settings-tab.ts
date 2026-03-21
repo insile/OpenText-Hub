@@ -35,11 +35,11 @@ export class OpenTextSettingTab extends PluginSettingTab {
 					this.plugin.settings.classifyByLinkEnabled = value;
 					await this.plugin.saveSettings();
 					if (value) {
-						this.plugin.classifyByLink.init();
-						this.plugin.classifyByLink.backlinkIndex.init();
+						this.plugin.classifyByBacklink.init();
+						this.plugin.classifyByBacklink.backlinkIndex.init();
 						new Notice("基于最短反向链接的分类已启用");
 					} else {
-						this.plugin.classifyByLink.close();
+						this.plugin.classifyByBacklink.close();
 					}
 				}));
 	}

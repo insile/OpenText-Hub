@@ -11,41 +11,38 @@ export function getFilesInFolder(folder: TFolder): TFile[] {
 
 // 类型转换辅助函数
 export function asNumber(value: unknown, defaultValue = 0): number {
-    return typeof value === 'number' ? value : defaultValue;
+    if (typeof value === 'number') {
+        return Number.isNaN(value) || !Number.isFinite(value) ? defaultValue : value;
+    }
+    return defaultValue;
 }
 
 export function asString(value: unknown, defaultValue = ''): string {
     return typeof value === 'string' ? value : defaultValue;
 }
 
-export function formatDate(date: Date): string {
-    return date.toISOString().split('T')[0]!;
-}
+// 解析时间周期字符串
+type MomentUnit = 'days' | 'weeks' | 'months' | 'years';
 
-// 数字操作映射
-export const NUMBER_OPERATIONS = {
-    'set': (current: number, operand: number) => operand,
-    'add': (current: number, operand: number) => current + operand,
-    'subtract': (current: number, operand: number) => current - operand,
-    'multiply': (current: number, operand: number) => current * operand,
-    'divide': (current: number, operand: number) => current / operand,
-} as const;
-
-// 时间周期单位对应的毫秒数
-export const PERIOD_MULTIPLIERS = {
-    d: 24 * 60 * 60 * 1000,
-    w: 7 * 24 * 60 * 60 * 1000,
-    m: 30 * 24 * 60 * 60 * 1000,
-    y: 365 * 24 * 60 * 60 * 1000
-} as const;
-
-// 解析时间周期字符串为毫秒数
-export function parsePeriod(period: string): number {
-    const match = period.match(/^(\d+)([dwmy])$/);
-    if (!match) return 0;
-    const num = parseInt(match[1]!, 10);
-    const unit = match[2] as keyof typeof PERIOD_MULTIPLIERS;
-    return num * (PERIOD_MULTIPLIERS[unit] ?? 0);
+// 解析时间周期字符串
+export function parsePeriod(input: string): { amount: number; unit: MomentUnit } {
+    // 匹配数字 + 单位 (d, w, m, y)
+    const match = input.match(/^(\d+)([dwmy])$/);
+    if (!match) {
+        return { amount: 0, unit: 'days' }; // 默认回退
+    }
+    const amount = parseInt(match[1] || '0', 10);
+    const unitChar = match[2] || 'd';
+    const unitMap: Record<string, MomentUnit> = {
+        'd': 'days',
+        'w': 'weeks',
+        'm': 'months',
+        'y': 'years'
+    };
+    return {
+        amount,
+        unit: unitMap[unitChar] || 'days'
+    };
 }
 
 // 解析 AI 响应的 JSON

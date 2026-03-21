@@ -1,6 +1,6 @@
 {
 	"name": "opentext-hub",
-	"version": "1.0.3",
+	"version": "1.0.4",
 	"description": "用于管理 OpenText 文档的工具箱",
 	"main": "main.js",
 	"type": "module",

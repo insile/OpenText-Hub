@@ -26,7 +26,7 @@ export class MetadataManagerView extends ItemView {
 	}
 
 	getIcon() {
-		return "settings";
+		return "cog";
 	}
 
 	async onOpen(): Promise<void> {
@@ -39,13 +39,13 @@ export class MetadataManagerView extends ItemView {
 
 	// 渲染配置界面
 	render() {
-		const {contentEl} = this;
+		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl('h2', {text: '元数据管理'});
+		contentEl.createEl('h2', { text: '元数据管理' });
 
 		// 动作管理
-		contentEl.createEl('h3', {text: '动作'});
+		contentEl.createEl('h3', { text: '动作' });
 
 		new Setting(contentEl)
 			.setName('添加动作')
@@ -59,7 +59,7 @@ export class MetadataManagerView extends ItemView {
 		});
 
 		// 命令管理
-		contentEl.createEl('h3', {text: '命令'});
+		contentEl.createEl('h3', { text: '命令' });
 
 		new Setting(contentEl)
 			.setName('添加命令')
@@ -73,24 +73,24 @@ export class MetadataManagerView extends ItemView {
 		});
 	}
 
-    // 打开新建动作弹窗
-    private openActionModal() {
-        const action: Action = {
-            id: Date.now().toString(),
-            name: '',
+	// 打开新建动作弹窗
+	private openActionModal() {
+		const action: Action = {
+			id: Date.now().toString(),
+			name: '',
 			field: '',
-            type: 'manual',
-            fieldType: 'number',
-            operation: 'set',
-        };
-        const modal = new ActionEditModal(this.app, action, (updatedAction) => {
-            this.plugin.settings.actions.push(updatedAction);
+			type: 'manual',
+			fieldType: 'number',
+			operation: 'set',
+		};
+		const modal = new ActionEditModal(this.app, action, (updatedAction) => {
+			this.plugin.settings.actions.push(updatedAction);
 			void this.plugin.saveSettings().then(() => {
 				this.render();
 			});
-        });
-        modal.open();
-    }
+		});
+		modal.open();
+	}
 
 	// 展示动作设置项
 	private displayAction(action: Action, index: number) {
@@ -144,30 +144,36 @@ export class MetadataManagerView extends ItemView {
 			case 'checkbox':
 				switch (action.operation) {
 					case 'toggle': return '切换';
-					case 'set': return '设置为选中';
-					case 'unset': return '设置为取消选中';
+					case 'set': return '选中';
+					case 'unset': return '取消';
 					default: return action.operation || '未知操作';
 				}
 			case 'date':
 				switch (action.operation) {
-					case 'set': return '设置日期' + (action.dateValue ? `（${action.dateValue}）` : '');
-					case 'add': return '增加周期' + (action.period ? `（${action.period}）` : '');
-					case 'subtract': return '减少周期' + (action.period ? `（${action.period}）` : '');
-					case 'current': return '当前日期';
-					case 'setWeekDay': return '设置为本周星期' + (action.weekday ? `（${action.weekday}）` : '');
+					case 'set': return '设置日期' + (action.dateValue ? `: ${action.dateValue}` : '');
+					case 'add': return '增加周期' + (action.period ? `: ${action.period}` : '');
+					case 'subtract': return '减少周期' + (action.period ? `: ${action.period}` : '');
+					case 'current': return '今天';
+					case 'setWeekDay': return '星期' + (action.weekday ? `: ${action.weekday}` : '') + (action.weekOffset ? `，偏移 ${action.weekOffset} 周` : '');
 					default: return action.operation || '未知操作';
 				}
 			case 'number':
 				switch (action.operation) {
-					case 'set': return '设置数值' + (action.numberValue ? `（${action.numberValue}）` : '');
-					case 'add': return '加' + (action.numberValue ? `（${action.numberValue}）` : '');
-					case 'subtract': return '减' + (action.numberValue ? `（${action.numberValue}）` : '');
-					case 'multiply': return '乘' + (action.numberValue ? `（${action.numberValue}）` : '');
-					case 'divide': return '除' + (action.numberValue ? `（${action.numberValue}）` : '');
+					case 'set': return '设置数值' + (action.numberValue ? `: ${action.numberValue}` : '');
+					case 'add': return '加' + (action.numberValue ? `: ${action.numberValue}` : '');
+					case 'subtract': return '减' + (action.numberValue ? `: ${action.numberValue}` : '');
+					case 'multiply': return '乘' + (action.numberValue ? `: ${action.numberValue}` : '');
+					case 'divide': return '除' + (action.numberValue ? `: ${action.numberValue}` : '');
 					default: return action.operation || '未知操作';
 				}
 			case 'text':
-				return '设置文本' + (action.stringValue ? `（${action.stringValue}）` : '');
+				switch (action.operation) {
+					case 'set': return '设置文本' + (action.stringValue ? `: ${action.stringValue}` : '');
+					case 'append': return '后缀文本' + (action.stringValue ? `: ${action.stringValue}` : '');
+					case 'prepend': return '前缀文本' + (action.stringValue ? `: ${action.stringValue}` : '');
+					case 'regex': return '正则表达式' + (action.regexPattern ? `: /${action.regexPattern}/${action.regexFlags || ''} 替换为 "${action.stringValue || ''}"` : '');
+					default: return action.operation || '未知操作';
+				}
 			default:
 				return action.operation || '未知操作';
 		}
@@ -192,7 +198,7 @@ export class MetadataManagerView extends ItemView {
 			actions: [],
 			folder: ''
 		};
-		const modal = new CommandEditModal(this.plugin,this.app, command, this.plugin.settings.actions, (updatedCommand) => {
+		const modal = new CommandEditModal(this.plugin, this.app, command, this.plugin.settings.actions, (updatedCommand) => {
 			this.plugin.settings.commands.push(updatedCommand);
 			void this.plugin.saveSettings().then(() => {
 				this.render();
@@ -205,7 +211,7 @@ export class MetadataManagerView extends ItemView {
 	private displayCommand(command: Command, index: number) {
 		const setting = new Setting(this.contentEl)
 			.setName(command.name || '未命名命令')
-			.setDesc(`动作数量：${command.actions.length}，路径：${command.folder}`);
+			.setDesc(`动作数量: ${command.actions.length}，路径: ${command.folder || '当前活动页面'}`);
 
 		setting.addButton(button => button
 			.setButtonText('编辑')
@@ -245,7 +251,7 @@ class ActionEditModal extends Modal {
 
 	constructor(app: App, action: Action, onSave: (action: Action) => void) {
 		super(app);
-		this.action = {...action};
+		this.action = { ...action };
 		this.onSave = onSave;
 	}
 
@@ -254,10 +260,10 @@ class ActionEditModal extends Modal {
 	}
 
 	renderModal() {
-		const {contentEl} = this;
+		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl('h2', {text: '编辑动作'});
+		contentEl.createEl('h2', { text: '编辑动作' });
 
 		// 动作名称
 		new Setting(contentEl)
@@ -351,8 +357,8 @@ class ActionEditModal extends Modal {
 				.addDropdown(dropdown => dropdown
 					.addOptions({
 						'toggle': '切换',
-						'set': '设置为选中',
-						'unset': '设置为取消选中'
+						'set': '选中',
+						'unset': '取消'
 					})
 					.setValue(manualAction.operation || 'toggle')
 					.onChange(value => {
@@ -367,8 +373,8 @@ class ActionEditModal extends Modal {
 						'set': '设置日期',
 						'add': '增加周期',
 						'subtract': '减少周期',
-						'current': '设置为当前日期',
-						'setWeekDay': '设置为本周星期'
+						'current': '今天',
+						'setWeekDay': '星期'
 					})
 					.setValue(manualAction.operation || 'set')
 					.onChange(value => {
@@ -379,9 +385,11 @@ class ActionEditModal extends Modal {
 			if (manualAction.operation === 'set') {
 				new Setting(contentEl)
 					.setName('日期值')
-					.addText(text => text
-						.setValue(manualAction.dateValue as string || '')
-						.onChange(value => manualAction.dateValue = value));
+					.addText(text => {
+						text.inputEl.type = 'date';
+						text.setValue(manualAction.dateValue || '')
+							.onChange(value => manualAction.dateValue = value)
+					});
 			} else if (manualAction.operation === 'add' || manualAction.operation === 'subtract') {
 				new Setting(contentEl)
 					.setName('周期值')
@@ -390,9 +398,16 @@ class ActionEditModal extends Modal {
 						.setValue(manualAction.period || '')
 						.onChange(value => manualAction.period = value));
 			} else if (manualAction.operation === 'setWeekDay') {
-				if (!manualAction.weekday) {manualAction.weekday = 1;}
+				if (!manualAction.weekday) { manualAction.weekday = 1; }
 				new Setting(contentEl)
-					.setName('星期')
+					.setName('星期与偏移')
+					.setDesc('0: 本周, 1: 下周, -1: 上周')
+					.addText(text => text
+						.setPlaceholder('0')
+						.setValue(manualAction.weekOffset?.toString() || '0')
+						.onChange(value => {
+							manualAction.weekOffset = parseInt(value) || 0;
+						}))
 					.addDropdown(dropdown => dropdown
 						.addOptions({
 							'1': '周一',
@@ -432,17 +447,43 @@ class ActionEditModal extends Modal {
 			new Setting(contentEl)
 				.setName('操作')
 				.addDropdown(dropdown => dropdown
-					.addOption('set', '设置文本')
+					.addOptions({
+						'set': '设置文本',
+						'append': '后缀文本',
+						'prepend': '前缀文本',
+						'regex': '正则表达式'
+					})
 					.setValue(manualAction.operation || 'set')
 					.onChange(value => {
 						manualAction.operation = value;
 						this.renderModal();
 					}));
-			new Setting(contentEl)
-				.setName('文本内容')
-				.addText(text => text
-					.setValue(manualAction.stringValue as string || '')
-					.onChange(value => manualAction.stringValue = value));
+			if (manualAction.operation === 'regex') {
+				new Setting(contentEl)
+					.setName('正则表达式')
+					.addText(text => text
+						.setPlaceholder('正则表达式 ...')
+						.setValue(manualAction.regexPattern || '')
+						.onChange(value => manualAction.regexPattern = value));
+				new Setting(contentEl)
+					.setName('替换为')
+					.addText(text => {
+						text.setPlaceholder('替换内容 ...')
+							.setValue(manualAction.stringValue || '')
+							.onChange(value => manualAction.stringValue = value);
+					})
+					.addText(text => {
+						text.setPlaceholder('修饰符 ...')
+							.setValue(manualAction.regexFlags || 'g')
+							.onChange(value => manualAction.regexFlags = value);
+					});
+			} else {
+				new Setting(contentEl)
+					.setName('文本内容')
+					.addText(text => text
+						.setValue(manualAction.stringValue || '')
+						.onChange(value => manualAction.stringValue = value));
+			}
 		}
 	}
 
@@ -450,7 +491,7 @@ class ActionEditModal extends Modal {
 	private renderAutoForm(contentEl: HTMLElement) {
 		new Setting(contentEl)
 			.setName('提示词')
-			.setDesc('返回 JSON 数据的提示词，可用 {content} 代表文档内容')
+			.setDesc('返回 JSON 数据的提示词，可用 {content} 代表文档内容, {filename} 代表文档名称')
 			.addTextArea(text => {
 				text.setValue(this.action.prompt || '')
 					.onChange(value => this.action.prompt = value);
@@ -474,16 +515,16 @@ class CommandEditModal extends Modal {
 	constructor(plugin: OpenTextHub, app: App, command: Command, actions: Action[], onSave: (command: Command) => void) {
 		super(app);
 		this.plugin = plugin;
-		this.command = {...command};
+		this.command = { ...command };
 		this.actions = actions;
 		this.onSave = onSave;
 	}
 
 	onOpen() {
-		const {contentEl} = this;
+		const { contentEl } = this;
 		contentEl.empty();
 
-		contentEl.createEl('h2', {text: '编辑命令'});
+		contentEl.createEl('h2', { text: '编辑命令' });
 
 		// 名称
 		new Setting(contentEl)
@@ -496,11 +537,11 @@ class CommandEditModal extends Modal {
 		new Setting(contentEl)
 			.setName('目标路径')
 			.setDesc('可填写单个文件路径或文件夹路径，留空则自动处理当前活动页面')
-            .addText(text => {
-                const input = text.setValue(this.command.folder);
-                new FolderSuggest(this.app, input.inputEl);
-                input.onChange(value => this.command.folder = value);
-            });
+			.addText(text => {
+				const input = text.setValue(this.command.folder);
+				new FolderSuggest(this.app, input.inputEl);
+				input.onChange(value => this.command.folder = value);
+			});
 
 		// 选择动作
 		const actionsSetting = new Setting(contentEl)

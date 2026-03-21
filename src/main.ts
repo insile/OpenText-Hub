@@ -3,21 +3,21 @@ import { MetadataManagerView, OPENTEXT_METADATA_MANAGER_VIEW } from "./ui/metada
 import { OpenTextSettingTab } from 'settings/settings-tab';
 import { MetadataManager } from 'core/metadata-manager';
 import { Plugin } from 'obsidian';
-import { ClassifyByLink } from "core/classify-by-backlink";
+import { ClassifyByBacklink } from "core/classify-by-backlink";
 
 
 // 主插件类
 export default class OpenTextHub extends Plugin {
 	settings: OpenTextSettings;
 	metadataManager: MetadataManager;
-	classifyByLink: ClassifyByLink;
+	classifyByBacklink: ClassifyByBacklink;
 
 	// 插件加载
 	async onload() {
 		await this.loadSettings();
 		this.addSettingTab(new OpenTextSettingTab(this.app, this));
 		this.metadataManager = new MetadataManager(this.app, this);
-		this.classifyByLink = new ClassifyByLink(this.app, this);
+		this.classifyByBacklink = new ClassifyByBacklink(this.app, this);
 		this.registerView(OPENTEXT_METADATA_MANAGER_VIEW, (leaf) => new MetadataManagerView(leaf, this));
 		this.addRibbonIcon('cog', '元数据管理', () => this.metadataManager.openManagerView());
 		
@@ -31,7 +31,7 @@ export default class OpenTextHub extends Plugin {
 	// 插件卸载
 	onunload() {
 		if (this.settings.classifyByLinkEnabled) {
-			this.classifyByLink.close();
+			this.classifyByBacklink.close();
 		}
 	}
 
