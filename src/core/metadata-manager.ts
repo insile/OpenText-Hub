@@ -39,7 +39,7 @@ export class MetadataManager {
 
     // 执行命令
     async executeCommand(command: Command) {
-        const notice = new Notice(`正在执行命令："${command.name}"，共 ${command.actions.length} 个动作`);
+        const notice = new Notice(`正在执行命令："${command.name}"，共 ${command.actions.length} 个动作`, 0);
 
         // 如果未填写目标路径，则处理当前活动页面
         if (!command.folder) {
@@ -47,154 +47,137 @@ export class MetadataManager {
             if (activeView && activeView.file) {
                 await this.executeActionsOnFile(activeView.file, command.actions);
                 notice.setMessage(`已在当前页面执行命令："${command.name}"`);
-                return;
             } else {
                 notice.setMessage('未找到当前活动的 Markdown 页面');
-                return;
             }
-        }
-
-        // 判断路径是文件还是文件夹
-        const target = this.app.vault.getAbstractFileByPath(command.folder);
-        if (!target) {
-            notice.setMessage(`未找到目标路径："${command.folder}"`);
-            return;
-        }
-        if (target instanceof TFile && target.extension === 'md') {
-            await this.executeActionsOnFile(target, command.actions);
-            notice.setMessage(`已在文件 "${target.name}" 上执行命令："${command.name}"`);
-        } else if (target instanceof TFolder) {
-            const files = getFilesInFolder(target);
-            const numberOfFiles = files.length;
-            let numberOfExecutedFiles = 0;
-            for (const file of files) {
-                if (file instanceof TFile && file.extension === 'md') {
-                    await this.executeActionsOnFile(file, command.actions);
-                    numberOfExecutedFiles++;
-                }
-                notice.setMessage(`正在执行命令："${command.name}"，已完成 ${numberOfExecutedFiles}/${numberOfFiles} 个文件`);
-            }
-            notice.setMessage(`已在路径 "${target.name}" 上执行命令："${command.name}"`);
         } else {
-            notice.setMessage('目标路径不是 Markdown 文件或文件夹');
+            // 判断路径是文件还是文件夹
+            const target = this.app.vault.getAbstractFileByPath(command.folder);
+            if (!target) {
+                notice.setMessage(`未找到目标路径："${command.folder}"`);
+            } else if (target instanceof TFile && target.extension === 'md') {
+                await this.executeActionsOnFile(target, command.actions);
+                notice.setMessage(`已在文件 "${target.name}" 上执行命令："${command.name}"`);
+            } else if (target instanceof TFolder) {
+                const files = getFilesInFolder(target);
+                const numberOfFiles = files.length;
+                let numberOfExecutedFiles = 0;
+                const chunkSize = 10; // 每组 10 个
+                const mdFiles = files.filter(f => f instanceof TFile && f.extension === 'md');
+                for (let i = 0; i < mdFiles.length; i += chunkSize) {
+                    const chunk = mdFiles.slice(i, i + chunkSize);
+                    // 这一组内并行执行
+                    await Promise.all(chunk.map(async (file) => {
+                        await this.executeActionsOnFile(file, command.actions);
+                        numberOfExecutedFiles++;
+                    }));
+                    // 每组完成后更新一次 UI
+                    notice.setMessage(`进度：${numberOfExecutedFiles}/${numberOfFiles}`);
+                }
+                notice.setMessage(`已在路径 "${target.name}" 上执行命令："${command.name}"`);
+            } else {
+                notice.setMessage('目标路径不是 Markdown 文件或文件夹');
+            }
         }
+        setTimeout(() => notice.hide(), 2000);
     }
 
     // 执行动作
-    private async executeActionsOnFile(file: TFile, actionIds: string[]): Promise<void> {
-        let frontmatter = this.app.metadataCache.getFileCache(file)?.frontmatter || {} as Record<string, unknown>;
+    private async executeActionsOnFile(file: TFile, actionIds: string[]) {
+        const cache = this.app.metadataCache.getFileCache(file);
+        const frontmatter = structuredClone(cache?.frontmatter || {});
 
         for (const actionId of actionIds) {
             const action = this.plugin.settings.actions.find(a => a.id === actionId);
             if (!action) continue;
-
             if (action.type === 'manual') {
-                await this.executeManualAction(file, frontmatter, action);
+                const field = action.field;
+                if (!field) continue;
+                frontmatter[field] = this.getUpdatedData(frontmatter[field], action);
             } else if (action.type === 'auto') {
-                await this.executeAutoAction(file, frontmatter, action);
+                const aiResult = await this.getUpdatedDataAI(file, frontmatter, action);
+                Object.assign(frontmatter, aiResult);
             }
         }
+
+        await this.app.fileManager.processFrontMatter(file, (fm: Record<string, unknown>) => {
+            for (const [key, value] of Object.entries(frontmatter)) {
+                fm[key] = value;
+            }
+        });
     }
 
-    // 执行手动动作
-    private async executeManualAction(file: TFile, frontmatter: Record<string, unknown>, action: Action): Promise<void> {
-        const field = action.field;
-        if (!field) return;
-        let newData: unknown;
+    // 手动更新数据
+    private getUpdatedData(currentValue: unknown, action: Action) {
+        const fieldContent = currentValue;
+        let newData: unknown = fieldContent;
 
         switch (action.fieldType) {
             case 'checkbox': {
-                if (action.operation === 'toggle') {
-                    newData = !frontmatter[field];
-                } else if (action.operation === 'set') {
-                    newData = true;
-                } else if (action.operation === 'unset') {
-                    newData = false;
-                }
+                if (action.operation === 'toggle') newData = !fieldContent;
+                else if (action.operation === 'set') newData = true;
+                else if (action.operation === 'unset') newData = false;
                 break;
             }
             case 'date': {
                 if (action.operation === 'set') {
                     newData = asString(action.dateValue) || window.moment().format('YYYY-MM-DD');
                 } else if (action.operation === 'add' || action.operation === 'subtract') {
-                    const rawValue = asString(frontmatter[field]);
-                    let current = window.moment(rawValue);
-                    if (!current.isValid()) {
-                        current = window.moment();
-                    }
+                    let m = window.moment(asString(fieldContent) || undefined);
+                    if (!m.isValid()) m = window.moment();
                     const { amount, unit } = parsePeriod(action.period || '');
                     const multiplier = action.operation === 'add' ? 1 : -1;
-                    current.add(amount * multiplier, unit);
-                    newData = current.format('YYYY-MM-DD');
+                    m.add(amount * multiplier, unit);
+                    newData = m.format('YYYY-MM-DD');
                 } else if (action.operation === 'current') {
                     newData = window.moment().format('YYYY-MM-DD');
                 } else if (action.operation === 'setWeekDay') {
-                    const weekday = asNumber(action.weekday, 1);     // 目标周几
-                    const weekOffset = asNumber(action.weekOffset, 0); // 周偏移
-                    const m = window.moment().startOf('day');
-                    m.isoWeekday(weekday + weekOffset * 7);
-                    newData = m.format('YYYY-MM-DD');
+                    const weekday = asNumber(action.weekday, 1);
+                    const weekOffset = asNumber(action.weekOffset, 0);
+                    newData = window.moment().startOf('day').isoWeekday(weekday + weekOffset * 7).format('YYYY-MM-DD');
                 }
                 break;
             }
             case 'number': {
-                if (action.operation === 'set') {
-                    newData = asNumber(action.numberValue);
-                } else if (action.operation === 'add') {
-                    newData = asNumber(frontmatter[field]) + asNumber(action.numberValue);
-                } else if (action.operation === 'subtract') {
-                    newData = asNumber(frontmatter[field]) - asNumber(action.numberValue);
-                } else if (action.operation === 'multiply') {
-                    newData = asNumber(frontmatter[field]) * asNumber(action.numberValue, 1);
-                } else if (action.operation === 'divide') {
-                    newData = asNumber(asNumber(frontmatter[field]) / asNumber(action.numberValue, 1), asNumber(frontmatter[field]));
+                const curNum = asNumber(fieldContent);
+                const actNum = asNumber(action.numberValue);
+                if (action.operation === 'set') newData = actNum;
+                else if (action.operation === 'add') newData = curNum + actNum;
+                else if (action.operation === 'subtract') newData = curNum - actNum;
+                else if (action.operation === 'multiply') newData = curNum * asNumber(action.numberValue, 1);
+                else if (action.operation === 'divide') {
+                    const divisor = asNumber(action.numberValue, 1);
+                    newData = divisor !== 0 ? curNum / divisor : curNum;
                 }
                 break;
             }
             case 'text': {
-                if (action.operation === 'set') {
-                    newData = asString(action.stringValue);
-                } else if (action.operation === 'append') {
-                    newData = asString(frontmatter[field]) + asString(action.stringValue);
-                } else if (action.operation === 'prepend') {
-                    newData = asString(action.stringValue) + asString(frontmatter[field]);
-                } else if (action.operation === 'regex') {
-                    const current = asString(frontmatter[field]);
-                    const pattern = action.regexPattern || '';     // 用户输入的正则，如: \d+
-                    const replacement = action.stringValue || '';  // 替换后的文本
-                    const flags = action.regexFlags || 'g';        // 正则修饰符，默认全局替换
-
+                const curText = asString(fieldContent);
+                if (action.operation === 'set') newData = asString(action.stringValue);
+                else if (action.operation === 'append') newData = curText + asString(action.stringValue);
+                else if (action.operation === 'prepend') newData = asString(action.stringValue) + curText;
+                else if (action.operation === 'regex') {
                     try {
-                        const regex = new RegExp(pattern, flags);
-                        newData = current.replace(regex, replacement);
+                        const regex = new RegExp(action.regexPattern || '', action.regexFlags || 'g');
+                        newData = curText.replace(regex, action.stringValue || '');
                     } catch (e) {
-                        // 如果正则解析失败，保持原样并可在控制台报错
                         console.error("Invalid Regex Pattern:", e);
-                        newData = current;
+                        newData = curText;
                     }
                 }
                 break;
             }
         }
-        await this.app.fileManager.processFrontMatter(file, (frontMatter: Record<string, unknown>) => {
-            frontMatter[field] = newData;
-        });
+        return newData;
     }
 
-    // 执行自动动作
-    private async executeAutoAction(file: TFile, frontmatter: Record<string, unknown>, action: Action): Promise<void> {
+    // 调用 AI 获取更新数据
+    private async getUpdatedDataAI(file: TFile, frontmatter: Record<string, unknown>, action: Action) {
         const prompt = action.prompt;
-
-        if (!prompt) {
-            new Notice('未设置提示词');
-            return;
-        }
-
         const secret = this.app.secretStorage.getSecret(this.plugin.settings.apiKey);
-
-        if (!secret) {
-            new Notice('未找到对应的 API key，请在插件设置中配置');
-            return;
+        if (!prompt || !secret) {
+            new Notice(!prompt ? '未设置提示词' : '未配置 API key');
+            return {};
         }
 
         const fileContent = await this.app.vault.cachedRead(file);
@@ -212,39 +195,35 @@ export class MetadataManager {
                     model: 'deepseek-chat',
                     messages: [
                         { "role": "system", "content": '你必须只返回有效的 JSON 数据，不包含任何其他文本。' },
-                        { "role": "user", "content": prompt.replace('{content}', content).replace('{filename}', file.basename) },
+                        { "role": "user", "content": prompt.replace(/{content}/g, content).replace(/{filename}/g, file.basename) },
                     ],
                 }),
             });
 
             if (response.status !== 200) {
                 new Notice(`AI 请求失败: ${response.status}`);
-                return;
+                return {};
             }
 
             const data = JSON.parse(response.text) as Record<string, unknown>;
             const choices = data.choices as Array<{ message: { content: string } }> | undefined;
             if (!choices?.[0]) {
                 new Notice('AI 响应格式错误');
-                return;
+                return {};
             }
-            const aiResponse = choices[0].message.content;
 
+            const aiResponse = choices[0].message.content;
+            console.debug(aiResponse)
             const jsonData = parseJsonResponse(aiResponse);
             if (!jsonData) {
                 new Notice('AI 返回的不是有效的 JSON 对象');
-                return;
+                return {};
             }
-
-            await this.app.fileManager.processFrontMatter(file, (frontMatter: Record<string, unknown>) => {
-                for (const [key, value] of Object.entries(jsonData)) {
-                    frontMatter[key] = value;
-                }
-            });
+            return jsonData
         } catch (error) {
             new Notice('调用 API 失败');
             console.debug('Error details:', error);
+            return {};
         }
     }
-
 }
